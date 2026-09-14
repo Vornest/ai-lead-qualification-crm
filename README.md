@@ -25,6 +25,7 @@ Manual qualification can result in:
 
 The system automates the initial lead processing pipeline:
 
+```text
 Incoming Lead
       ↓
 Input Validation
