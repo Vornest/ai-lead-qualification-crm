@@ -25,7 +25,6 @@ Manual qualification can result in:
 
 The system automates the initial lead processing pipeline:
 
-```text
 Incoming Lead
       ↓
 Input Validation
@@ -294,13 +293,3 @@ This project demonstrates how AI and workflow automation can be combined to auto
 Author
 
 Built as part of an Automation Engineer portfolio project.
-
-
----
-
-# STEP 2 — Commit README
-
-Set commit message:
-
-```text
-Create project README
