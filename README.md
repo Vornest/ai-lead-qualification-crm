@@ -305,3 +305,21 @@ This project demonstrates how AI and workflow automation can automate a real bus
 Author
 
 Built as part of an Automation Engineer portfolio project.
+
+## Project Evidence
+
+### n8n Workflow
+
+![n8n Workflow](docs/screenshots/workflow.png)
+
+### Successful API Request
+
+![Successful API Response](docs/screenshots/postman-success.png)
+
+### Validation / Error Handling
+
+![API Error Response](docs/screenshots/postman-error.png)
+
+### Supabase Database
+
+![Supabase Database](docs/screenshots/supabase-database.png)
