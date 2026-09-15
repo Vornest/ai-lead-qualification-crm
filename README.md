@@ -294,3 +294,40 @@ This project demonstrates how AI and workflow automation can be combined to auto
 Author
 
 Built as part of an Automation Engineer portfolio project.
+
+## Documentation
+
+- [System Architecture](docs/architecture.md)
+- [API Documentation](docs/api.md)
+- [Testing Documentation](docs/testing.md)
+- [n8n Workflow Export](workflow/ai-lead-qualification.json)
+
+## Project Evidence
+
+### n8n Workflow
+
+![n8n Workflow](docs/screenshots/workflow.png)
+
+### Successful API Request
+
+![Successful API Response](docs/screenshots/postman-success.png)
+
+### Validation / Error Handling
+
+![API Error Response](docs/screenshots/postman-error.png)
+
+### Supabase Database
+
+![Supabase Database](docs/screenshots/supabase-database.png)
+
+## Project Highlights
+
+- REST webhook-based lead intake
+- Input validation before AI processing
+- Google Gemini-powered lead qualification
+- Structured AI output using an output parser
+- Automated lead scoring and priority classification
+- Duplicate detection using workflow logic
+- Database-level duplicate protection using a UNIQUE constraint
+- Structured HTTP API responses
+- Automated CRM data storage with Supabase/PostgreSQL
