@@ -1,6 +1,6 @@
 # AI Lead Qualification & CRM Automation System
 
-AI-powered lead qualification and CRM automation system built with n8n, Google Gemini, and Supabase/PostgreSQL.
+AI-powered lead qualification and CRM automation built with n8n, Google Gemini, and Supabase/PostgreSQL.
 
 ## Overview
 
@@ -25,75 +25,53 @@ Manual qualification can result in:
 
 The system automates the initial lead processing pipeline:
 
+Webhook → Input Validation → AI Qualification → Lead Scoring → Priority Classification → Duplicate Detection → Supabase → API Response
+
+## Architecture
+
 ```text
-Incoming Lead
-      ↓
-Input Validation
-      ↓
-AI Lead Qualification
-      ↓
-Lead Scoring
-      ↓
-Priority Classification
-      ↓
-Duplicate Detection
-      ↓
-Supabase / PostgreSQL
-      ↓
-Structured API Response
-
-
-Architecture
-
-                    ┌───────────────────┐
-                    │      Client       │
-                    │   REST / Postman  │
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │    n8n Webhook    │
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │  Input Validation │
-                    │                   │
-                    │ Required Fields   │
-                    │ Email Validation  │
-                    │ Budget Validation │
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │   Google Gemini   │
-                    │ Lead Qualification│
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │ Structured Output │
-                    │      Parser       │
-                    └─────────┬─────────┘
-                              │
-                              ▼
-                    ┌───────────────────┐
-                    │ Duplicate Check   │
-                    └─────────┬─────────┘
-                              │
-                       ┌──────┴──────┐
-                       │             │
-                     EXISTS       NOT EXISTS
-                       │             │
-                       ▼             ▼
-                    409 Error     Create Row
-                                     │
-                                     ▼
-                                201 Created
-
+Client / Postman
+      |
+      v
+n8n Webhook
+      |
+      v
+Required Validation
+      |
+      v
+Budget Validation
+      |
+      v
+Email Validation
+      |
+      v
+Prepare Lead Data
+      |
+      v
+Google Gemini
+      |
+      v
+Structured Output Parser
+      |
+      v
+Merge AI Result
+      |
+      v
+Search Lead
+      |
+      v
+IF Exists?
+    /      \
+  YES       NO
+   |         |
+   v         v
+409       Create Row
+Conflict      |
+              v
+         201 Created
 Input
 
-The API accepts the following payload:
+The API accepts:
 
 {
   "customer_name": "Daniel",
@@ -104,7 +82,14 @@ The API accepts the following payload:
 }
 AI Qualification
 
-Google Gemini analyzes the lead and generates:
+Google Gemini generates:
+
+lead_score
+priority
+reason
+recommended_action
+
+Example:
 
 {
   "lead_score": 90,
@@ -118,30 +103,28 @@ Budget	Score
 1500 - 2999	70
 500 - 1499	50
 < 500	30
-Priority
+Priority Rules
 Score	Priority
 80 - 100	HOT
 50 - 79	WARM
 0 - 49	COLD
 Validation
 
-The API validates incoming data before processing.
+The API validates incoming data before AI processing.
 
-Required fields
-
-The following fields are required:
-
+Required Fields
 customer_name
 customer_email
 company
 requirement
 budget
-Email validation
+Email Validation
 
-Invalid email formats are rejected with:
+Invalid email formats return:
 
 400 Bad Request
-Budget validation
+
+Budget Validation
 
 Budget must:
 
@@ -151,29 +134,32 @@ Be greater than 0
 
 Examples:
 
-2500     → Valid
-"2500"   → Invalid
-0        → Invalid
--500     → Invalid
+Input	Result
+2500	Valid
+"2500"	Invalid
+0	Invalid
+-500	Invalid
 Duplicate Protection
 
 Duplicate protection is implemented at two levels.
 
-Application level
+Application Level
 
-n8n checks whether the lead already exists before creating a new record.
+n8n searches for an existing lead using customer_email before creating a new record.
 
-Database level
+Database Level
 
-Supabase/PostgreSQL uses a UNIQUE constraint on:
+Supabase/PostgreSQL enforces a UNIQUE constraint on:
 
 customer_email
 
-This prevents duplicate records even if application-level validation fails.
+This provides a second layer of protection against duplicate records.
 
 API Response
-Successful lead creation
+Successful Lead Creation
+
 201 Created
+
 {
   "success": true,
   "data": {
@@ -186,11 +172,13 @@ Successful lead creation
     "lead_score": 90,
     "priority": "HOT",
     "reason": "The lead has a high budget and a clear automation requirement.",
-    "recommended_action": "Schedule discovery call."
+    "recommended_action": "Schedule a discovery call."
   }
 }
-Validation error
+Validation Error
+
 400 Bad Request
+
 {
   "success": false,
   "error": {
@@ -198,8 +186,10 @@ Validation error
     "message": "customer_name, company, and requirement are required"
   }
 }
-Invalid email
+Invalid Email
+
 400 Bad Request
+
 {
   "success": false,
   "error": {
@@ -207,8 +197,10 @@ Invalid email
     "message": "Invalid email format"
   }
 }
-Invalid budget
+Invalid Budget
+
 400 Bad Request
+
 {
   "success": false,
   "error": {
@@ -216,8 +208,10 @@ Invalid budget
     "message": "budget must be a number greater than 0"
   }
 }
-Duplicate lead
+Duplicate Lead
+
 409 Conflict
+
 {
   "success": false,
   "error": {
@@ -227,43 +221,60 @@ Duplicate lead
 }
 Database
 
-The project uses Supabase/PostgreSQL for persistent lead storage.
+The project uses Supabase/PostgreSQL for persistent CRM storage.
 
 Main table:
 
 leads
-├── id
-├── customer_name
-├── customer_email
-├── company
-├── requirement
-├── budget
-├── lead_score
-├── priority
-├── reason
-├── recommended_action
-└── created_at
+
+Fields:
+
+id
+customer_name
+customer_email
+company
+requirement
+budget
+lead_score
+priority
+reason
+recommended_action
+created_at
 
 Database protection:
 
 UNIQUE(customer_email)
+
+Documentation
+System Architecture
+API Documentation
+Testing Documentation
+n8n Workflow Export
+Project Evidence
+n8n Workflow
+
+Successful API Request
+
+Validation / Error Handling
+
+Supabase Database
+
 Testing
 
-The workflow was tested using Postman and Supabase.
-
-Test cases include:
+The system was tested using Postman and Supabase.
 
 Test	Expected Result
 Valid lead	201 Created
 Duplicate email	409 Conflict
 Invalid email	400 Bad Request
-Missing customer_name	400 Bad Request
-Missing company	400 Bad Request
-Missing requirement	400 Bad Request
+Missing required field	400 Bad Request
 Budget as String	400 Bad Request
 Budget = 0	400 Bad Request
 Negative budget	400 Bad Request
-Duplicate database insert	Rejected by UNIQUE constraint
+Database duplicate insert	Rejected
+
+All defined validation, duplicate detection, AI qualification, API response, and database integrity tests passed successfully.
+
 Technology Stack
 n8n
 Google Gemini
@@ -289,45 +300,8 @@ Business Logic
 Data Transformation
 Project Goal
 
-This project demonstrates how AI and workflow automation can be combined to automate a real business process from API input to database storage.
+This project demonstrates how AI and workflow automation can automate a real business process from API input to CRM database storage.
 
 Author
 
 Built as part of an Automation Engineer portfolio project.
-
-## Documentation
-
-- [System Architecture](docs/architecture.md)
-- [API Documentation](docs/api.md)
-- [Testing Documentation](docs/testing.md)
-- [n8n Workflow Export](workflow/ai-lead-qualification.json)
-
-## Project Evidence
-
-### n8n Workflow
-
-![n8n Workflow](docs/screenshots/workflow.png)
-
-### Successful API Request
-
-![Successful API Response](docs/screenshots/postman-success.png)
-
-### Validation / Error Handling
-
-![API Error Response](docs/screenshots/postman-error.png)
-
-### Supabase Database
-
-![Supabase Database](docs/screenshots/supabase-database.png)
-
-## Project Highlights
-
-- REST webhook-based lead intake
-- Input validation before AI processing
-- Google Gemini-powered lead qualification
-- Structured AI output using an output parser
-- Automated lead scoring and priority classification
-- Duplicate detection using workflow logic
-- Database-level duplicate protection using a UNIQUE constraint
-- Structured HTTP API responses
-- Automated CRM data storage with Supabase/PostgreSQL
