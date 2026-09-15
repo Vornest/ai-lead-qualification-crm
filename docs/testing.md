@@ -2,9 +2,17 @@
 
 ## Testing Overview
 
-The AI Lead Qualification & CRM Automation System was tested using Postman and Supabase to verify input validation, AI processing, duplicate protection, API responses, and database integrity.
+The AI Lead Qualification & CRM Automation System was tested using Postman and Supabase/PostgreSQL.
 
----
+Testing focused on:
+
+- Input validation
+- Email validation
+- Budget validation
+- AI qualification
+- Duplicate detection
+- API response handling
+- Database integrity
 
 ## Test Environment
 
@@ -13,17 +21,17 @@ The AI Lead Qualification & CRM Automation System was tested using Postman and S
 | Workflow Engine | n8n Cloud |
 | AI Model | Google Gemini |
 | Database | Supabase / PostgreSQL |
-| API Client | Postman |
+| API Testing | Postman |
 
 ---
 
-## Test Cases
+## Test Case 1 — Valid Lead Creation
 
-### 1. Valid Lead Creation
+### Objective
 
-**Purpose:** Verify that a valid lead passes all validation steps, is processed by AI, stored in the database, and returns a successful response.
+Verify that a valid lead passes validation, is processed by Gemini, stored in the database, and returns a successful response.
 
-**Input:**
+### Request
 
 ```json
 {
@@ -33,21 +41,37 @@ The AI Lead Qualification & CRM Automation System was tested using Postman and S
   "requirement": "Need AI automation for our sales process",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 201 Created
+```
 
-Result: PASS
+### Actual Result
 
-The lead was successfully processed by Gemini and stored in Supabase with an AI-generated score and priority.
+```text
+PASS
+```
 
-2. Duplicate Lead
+The lead was successfully processed and stored in Supabase.
 
-Purpose: Verify that an existing email address cannot create another CRM record.
+The AI generated a lead score and priority, and the API returned a structured success response.
 
-Input:
+---
 
+## Test Case 2 — Duplicate Lead
+
+### Objective
+
+Verify that an existing lead cannot be inserted again.
+
+### Request
+
+The same email address is submitted again:
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel@example.com",
@@ -55,10 +79,17 @@ Input:
   "requirement": "Need AI automation for our sales process",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 409 Conflict
+```
+
+### Response
+
+```json
 {
   "success": false,
   "error": {
@@ -66,17 +97,27 @@ HTTP 409 Conflict
     "message": "Lead already exists"
   }
 }
+```
 
-Result: PASS
+### Actual Result
 
-The workflow detected the existing lead and prevented a new record from being created.
+```text
+PASS
+```
 
-3. Invalid Email
+The workflow detected the existing lead and prevented another record from being created.
 
-Purpose: Verify email format validation.
+---
 
-Input:
+## Test Case 3 — Invalid Email
 
+### Objective
+
+Verify email validation.
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel123",
@@ -84,77 +125,133 @@ Input:
   "requirement": "Need AI automation",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Response
 
-The request was rejected before AI processing.
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_EMAIL",
+    "message": "Invalid email format"
+  }
+}
+```
 
-4. Missing customer_name
+### Actual Result
 
-Purpose: Verify required field validation.
+```text
+PASS
+```
 
-Input:
+The workflow rejected the request before continuing to AI processing.
 
+---
+
+## Test Case 4 — Missing customer_name
+
+### Objective
+
+Verify required field validation.
+
+### Request
+
+```json
 {
   "customer_name": "",
-  "customer_email": "daniel@example.com",
+  "customer_email": "daniel2@example.com",
   "company": "Nova Systems",
   "requirement": "Need AI automation",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Actual Result
 
-5. Missing company
+```text
+PASS
+```
 
-Input:
+---
 
+## Test Case 5 — Missing company
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
-  "customer_email": "daniel@example.com",
+  "customer_email": "daniel3@example.com",
   "company": "",
   "requirement": "Need AI automation",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Actual Result
 
-6. Missing requirement
+```text
+PASS
+```
 
-Input:
+---
 
+## Test Case 6 — Missing requirement
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
-  "customer_email": "daniel@example.com",
+  "customer_email": "daniel4@example.com",
   "company": "Nova Systems",
   "requirement": "",
   "budget": 3500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Actual Result
 
-7. Budget as String
+```text
+PASS
+```
 
-Purpose: Verify that budget must be a Number rather than a String.
+---
 
-Input:
+## Test Case 7 — Budget as String
 
+### Objective
+
+Verify that the budget must be a Number.
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel30@example.com",
@@ -162,10 +259,17 @@ Input:
   "requirement": "Need AI automation",
   "budget": "3500"
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
+
+### Response
+
+```json
 {
   "success": false,
   "error": {
@@ -173,13 +277,27 @@ HTTP 400 Bad Request
     "message": "budget must be a number greater than 0"
   }
 }
+```
 
-Result: PASS
+### Actual Result
 
-8. Budget = 0
+```text
+PASS
+```
 
-Input:
+The request was rejected because `"3500"` is a String rather than a Number.
 
+---
+
+## Test Case 8 — Budget = 0
+
+### Objective
+
+Verify that a zero budget is rejected.
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel40@example.com",
@@ -187,17 +305,31 @@ Input:
   "requirement": "Need AI automation",
   "budget": 0
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Actual Result
 
-9. Negative Budget
+```text
+PASS
+```
 
-Input:
+---
 
+## Test Case 9 — Negative Budget
+
+### Objective
+
+Verify that negative budget values are rejected.
+
+### Request
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel50@example.com",
@@ -205,72 +337,124 @@ Input:
   "requirement": "Need AI automation",
   "budget": -500
 }
+```
 
-Expected Result:
+### Expected Result
 
+```text
 HTTP 400 Bad Request
+```
 
-Result: PASS
+### Actual Result
 
-10. Database Unique Constraint
+```text
+PASS
+```
 
-Purpose: Verify that the database independently prevents duplicate email addresses.
+---
 
-A direct duplicate INSERT was executed against the Supabase/PostgreSQL database.
+## Test Case 10 — Database UNIQUE Constraint
 
-Expected Result:
+### Objective
 
-PostgreSQL error code: 23505
+Verify that the database independently rejects duplicate email addresses.
+
+A direct duplicate INSERT was executed against Supabase/PostgreSQL using an email address that already existed.
+
+### Expected Result
+
+The database should reject the record because of the UNIQUE constraint on `customer_email`.
+
+### Actual Result
+
+```text
+PASS
+```
+
+PostgreSQL returned:
+
+```text
 duplicate key value violates unique constraint
 "leads_customer_email_unique"
+```
 
-Result: PASS
+This confirms that the database provides an independent layer of duplicate protection.
 
-The database rejected the duplicate record.
+---
 
-Test Summary
-Test Case	Expected	Result
-Valid lead creation	201	PASS
-Duplicate lead	409	PASS
-Invalid email	400	PASS
-Missing customer_name	400	PASS
-Missing company	400	PASS
-Missing requirement	400	PASS
-Budget as String	400	PASS
-Budget = 0	400	PASS
-Negative budget	400	PASS
-Database duplicate insert	Rejected	PASS
-Validation Coverage
+## Test Summary
 
-The system validates:
+| Test Case | Expected Result | Result |
+|---|---|---|
+| Valid lead creation | 201 Created | PASS |
+| Duplicate lead | 409 Conflict | PASS |
+| Invalid email | 400 Bad Request | PASS |
+| Missing customer_name | 400 Bad Request | PASS |
+| Missing company | 400 Bad Request | PASS |
+| Missing requirement | 400 Bad Request | PASS |
+| Budget as String | 400 Bad Request | PASS |
+| Budget = 0 | 400 Bad Request | PASS |
+| Negative budget | 400 Bad Request | PASS |
+| Database duplicate INSERT | Rejected | PASS |
 
+---
+
+## Validation Coverage
+
+The final workflow validates:
+
+```text
 Required Fields
-       ↓
+        |
+        v
 Email Format
-       ↓
+        |
+        v
 Budget Type
-       ↓
+        |
+        v
 Budget Value
-       ↓
-Duplicate Email
-Database Integrity
+        |
+        v
+Duplicate Lead
+```
 
-Duplicate protection is implemented using both:
+---
 
-Application Layer
-        +
-Database Layer
+## API Response Coverage
 
-The application checks for an existing lead before insertion.
+The tested API response codes are:
 
-The database independently enforces:
+| Status Code | Scenario |
+|---:|---|
+| `201` | Valid lead successfully created |
+| `400` | Invalid input |
+| `409` | Duplicate lead |
 
+---
+
+## Database Integrity
+
+The application performs an existence check before creating a new record.
+
+The database additionally enforces:
+
+```text
 UNIQUE(customer_email)
+```
 
-This provides defense in depth against duplicate records.
+This creates a defense-in-depth approach:
 
-Test Conclusion
+```text
+n8n duplicate detection
+        +
+PostgreSQL UNIQUE constraint
+```
+
+---
+
+## Test Conclusion
 
 All defined validation, duplicate detection, AI qualification, API response, and database integrity tests passed successfully.
 
-The workflow is considered ready for portfolio demonstration.
+The final workflow is suitable for portfolio demonstration as an AI-powered lead qualification and CRM automation system.
