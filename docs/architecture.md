@@ -2,83 +2,97 @@
 
 ## Overview
 
-The AI Lead Qualification & CRM Automation System is an n8n-based workflow that automates the initial processing of incoming sales leads.
+The AI Lead Qualification & CRM Automation System is an n8n-based workflow that automates lead intake, validation, AI qualification, duplicate detection, and CRM storage.
 
-The system validates incoming API requests, performs AI-based lead qualification using Google Gemini, checks for existing leads, and stores valid leads in Supabase/PostgreSQL.
+The workflow combines:
 
----
+- n8n for workflow orchestration
+- Google Gemini for AI lead qualification
+- Supabase/PostgreSQL for persistent CRM storage
+- REST webhook for API access
 
 ## High-Level Architecture
 
 ```text
-Client / API Request
-        |
-        v
-+----------------------+
-|      n8n Webhook     |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|  Required Validation |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|   Budget Validation  |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|    Email Validation  |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|   Prepare Lead Data  |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|    Google Gemini     |
-| Lead Qualification   |
-+----------+-----------+
-           |
-           v
-+----------------------+
-| Structured Output    |
-|      Parser          |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|    Merge AI Result   |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|     Search Lead      |
-+----------+-----------+
-           |
-           v
-+----------------------+
-|     IF Exists?       |
-+------+----------+---+
-       |          |
-     TRUE       FALSE
-       |          |
-       v          v
-  409 Conflict  Create Row
-                    |
-                    v
-              201 Created
-Workflow Components
-1. Webhook
+                        Client / Postman
+                               |
+                               v
+                        +--------------+
+                        |   Webhook    |
+                        +------+-------+
+                               |
+                               v
+                     +-------------------+
+                     | Required          |
+                     | Validation        |
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Budget            |
+                     | Validation       |
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Email Validation |
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Prepare Lead Data|
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Google Gemini     |
+                     | Lead Qualification|
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Structured Output |
+                     | Parser            |
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Merge AI Result   |
+                     +---------+---------+
+                               |
+                               v
+                     +-------------------+
+                     | Search Lead      |
+                     +---------+---------+
+                               |
+                               v
+                         +-----------+
+                         | IF Exists?|
+                         +-----+-----+
+                              / \
+                            YES  NO
+                             |    |
+                             v    v
+                       +------+  +-------------+
+                       | 409  |  | Create Row  |
+                       |      |  +------+------+
+                       +------+         |
+                                        v
+                                  +-----------+
+                                  | 201       |
+                                  | Created   |
+                                  +-----------+
+```
 
-Receives incoming lead data through an HTTP POST request.
+## Workflow Components
 
-Example:
+### 1. Webhook
 
+The Webhook node receives an HTTP `POST` request containing the incoming lead data.
+
+Expected input structure:
+
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel@example.com",
@@ -86,121 +100,367 @@ Example:
   "requirement": "Need AI automation for our sales process",
   "budget": 3500
 }
-2. Required Field Validation
+```
 
-Validates that the following fields are present and not empty:
+The Webhook acts as the entry point of the automation.
 
+---
+
+### 2. Required Validation
+
+The `Required Validation` node checks that the following fields exist and contain values:
+
+```text
 customer_name
+customer_email
 company
 requirement
+```
 
-Invalid requests return:
+Invalid input is routed to the `Required False` response node.
 
+Response:
+
+```text
 HTTP 400 Bad Request
-3. Budget Validation
+```
 
-Validates that:
+---
 
+### 3. Budget Validation
+
+The `Budget Validation` node checks three conditions:
+
+```text
 budget exists
 budget is a Number
-budget is greater than 0
+budget > 0
+```
 
-Examples:
-
-2500     → valid
-"2500"   → invalid
-0        → invalid
--500     → invalid
-
-Invalid requests return:
-
-HTTP 400 Bad Request
-4. Email Validation
-
-Validates the email format before any AI or database processing occurs.
-
-Invalid email requests return:
-
-HTTP 400 Bad Request
-5. Prepare Lead Data
-
-Normalizes validated webhook input into a consistent structure for downstream processing.
-
-6. Google Gemini
-
-Google Gemini analyzes the lead and generates:
-
-Lead score
-Priority
-Reason
-Recommended action
+The validation expression evaluates the original webhook payload before data normalization.
 
 Example:
 
-{
-  "lead_score": 90,
-  "priority": "HOT",
-  "reason": "The lead has a high budget and a clear automation requirement.",
-  "recommended_action": "Schedule a discovery call."
-}
-7. Structured Output Parser
+```text
+2500     → Valid
+"2500"   → Invalid
+0        → Invalid
+-500     → Invalid
+```
 
-The AI response is validated against a predefined JSON schema to ensure that downstream nodes receive predictable structured data.
+Invalid input is routed to the `Budget False` response node.
 
-Expected structure:
+Response:
 
+```text
+HTTP 400 Bad Request
+```
+
+---
+
+### 4. Email Validation
+
+The `Email Validate` node checks the incoming `customer_email` against the workflow email validation pattern.
+
+Invalid email input is routed to the `Email False` response node.
+
+Response:
+
+```text
+HTTP 400 Bad Request
+```
+
+---
+
+### 5. Prepare Lead Data
+
+The `Prepare Lead Data` node normalizes the validated webhook data into a consistent structure used by downstream nodes.
+
+The normalized fields are:
+
+```text
+customer_name
+customer_email
+company
+project_requirements
+budget
+```
+
+This creates a predictable input structure for the AI qualification stage.
+
+---
+
+### 6. Google Gemini
+
+The `Basic LLM Chain` uses the Google Gemini chat model.
+
+Gemini receives the normalized lead information and is instructed to generate:
+
+```text
+lead_score
+priority
+reason
+recommended_action
+```
+
+The workflow currently uses these budget-based scoring rules:
+
+```text
+>= 3000
+→ 90
+
+1500 - 2999
+→ 70
+
+500 - 1499
+→ 50
+
+< 500
+→ 30
+```
+
+Priority is then assigned according to the score:
+
+```text
+80 - 100
+→ HOT
+
+50 - 79
+→ WARM
+
+0 - 49
+→ COLD
+```
+
+---
+
+### 7. Structured Output Parser
+
+The `Structured Output Parser` ensures that Gemini returns data in a predictable JSON structure.
+
+Expected schema:
+
+```json
 {
   "lead_score": 90,
   "priority": "HOT",
   "reason": "string",
   "recommended_action": "string"
 }
-8. Merge AI Result
+```
 
-Combines the original validated lead data with the AI-generated qualification result.
+Required fields:
+
+```text
+lead_score
+priority
+reason
+recommended_action
+```
+
+This provides structured data for the following workflow stages.
+
+---
+
+### 8. Merge AI Result
+
+The `Merge AI Result` node combines the original lead data with the AI-generated qualification result.
+
+The combined structure contains:
+
+```text
+customer_name
+customer_email
+company
+project_requirements
+budget
+lead_score
+priority
+reason
+recommended_action
+```
 
 Example:
 
+```json
 {
   "customer_name": "Daniel",
   "customer_email": "daniel@example.com",
   "company": "Nova Systems",
-  "requirement": "Need AI automation for our sales process",
+  "project_requirements": "Need AI automation for our sales process",
   "budget": 3500,
   "lead_score": 90,
   "priority": "HOT",
   "reason": "The lead has a high budget and a clear automation requirement.",
   "recommended_action": "Schedule a discovery call."
 }
-9. Search Lead
+```
 
-Searches the Supabase leads table using the customer's email address.
+---
 
-This step is used to identify whether the lead already exists.
+### 9. Search Lead
 
-10. Duplicate Detection
+The `Search Lead` node queries the Supabase `leads` table using:
 
-The workflow checks whether an existing record was found.
+```text
+customer_email
+```
 
-If the lead exists:
+The objective is to determine whether the lead already exists in the CRM database.
 
-HTTP 409 Conflict
+The node is configured to return data when a matching lead is found.
+
+---
+
+### 10. IF Exists?
+
+The `IF Exists?` node determines the next action based on whether a lead record was found.
+
+#### TRUE branch
+
+If an existing lead is found:
+
+```text
+Duplicate
+    ↓
+409 Conflict
+```
+
+#### FALSE branch
+
+If no existing lead is found:
+
+```text
+Create a row
+    ↓
+Success
+    ↓
+201 Created
+```
+
+---
+
+### 11. Create Row
+
+The `Create a row` node inserts the qualified lead into the Supabase `leads` table.
+
+Stored fields include:
+
+```text
+customer_name
+customer_email
+company
+budget
+lead_score
+priority
+reason
+recommended_action
+requirement
+```
+
+---
+
+### 12. Success Response
+
+The `Success` node returns a structured response after successful database insertion.
 
 Response:
 
+```text
+HTTP 201 Created
+```
+
+Example:
+
+```json
 {
-  "success": false,
-  "error": {
-    "code": "DUPLICATE_LEAD",
-    "message": "Lead already exists"
+  "success": true,
+  "data": {
+    "id": 28,
+    "customer_name": "Daniel",
+    "customer_email": "daniel@example.com",
+    "company": "Nova Systems",
+    "budget": 3500,
+    "requirement": "Need AI automation for our sales process",
+    "lead_score": 90,
+    "priority": "HOT",
+    "reason": "The lead has a high budget and a clear automation requirement.",
+    "recommended_action": "Schedule a discovery call."
   }
 }
-11. Supabase / PostgreSQL
+```
 
-Valid leads are stored in the leads table.
+---
 
-Main fields:
+## Error Handling
 
+The workflow contains dedicated response nodes for invalid requests.
+
+### Required Validation Failure
+
+```text
+Required Validation
+        |
+        v
+Required False
+        |
+        v
+HTTP 400
+```
+
+### Budget Validation Failure
+
+```text
+Budget Validation
+        |
+        v
+Budget False
+        |
+        v
+HTTP 400
+```
+
+### Email Validation Failure
+
+```text
+Email Validate
+        |
+        v
+Email False
+        |
+        v
+HTTP 400
+```
+
+### Duplicate Lead
+
+```text
+IF Exists?
+    |
+   TRUE
+    |
+    v
+Duplicate
+    |
+    v
+HTTP 409
+```
+
+---
+
+## Database Architecture
+
+The system uses Supabase/PostgreSQL as the CRM storage layer.
+
+Main table:
+
+```text
+leads
+```
+
+Relevant fields:
+
+```text
 id
 customer_name
 customer_email
@@ -212,71 +472,114 @@ priority
 reason
 recommended_action
 created_at
+```
 
-The database also contains a unique constraint on:
+### Database-Level Duplicate Protection
 
-customer_email
+The `customer_email` field is protected by a UNIQUE constraint.
 
-This provides a second layer of duplicate protection at the database level.
+Constraint:
 
-Error Handling
+```text
+leads_customer_email_unique
+```
 
-The workflow uses HTTP status codes to communicate the result of each request.
+This prevents duplicate records at the database layer.
 
-Status Code	Meaning
-201	Lead created successfully
-400	Invalid input
-409	Duplicate lead
-404	Resource not found
-Data Flow
+---
 
-The complete data flow is:
+## Defense in Depth
 
-HTTP Request
-    ↓
+Duplicate protection is intentionally implemented in two layers:
+
+```text
+Application Layer
+        |
+        v
+n8n Search Lead
+        |
+        v
+Duplicate Detection
+
+        +
+
+Database Layer
+        |
+        v
+UNIQUE(customer_email)
+```
+
+This means the workflow checks for duplicates before insertion while the database independently enforces uniqueness.
+
+---
+
+## End-to-End Data Flow
+
+```text
+HTTP POST Request
+        |
+        v
+Webhook
+        |
+        v
+Input Validation
+        |
+        v
+Data Preparation
+        |
+        v
+Google Gemini
+        |
+        v
+Structured AI Output
+        |
+        v
+Merge Lead + AI Data
+        |
+        v
+Duplicate Check
+        |
+        +----------------+
+        |                |
+     Exists          Not Exists
+        |                |
+        v                v
+   409 Conflict      Create Row
+                         |
+                         v
+                    201 Created
+```
+
+## Design Principles
+
+### Validate Before Processing
+
+Invalid input is rejected before AI qualification and database creation.
+
+### Structured AI Output
+
+Gemini output is validated through a structured output parser before downstream processing.
+
+### Defense in Depth
+
+Duplicate protection exists in both the workflow and database.
+
+### Separation of Responsibilities
+
+Each node performs a specific role:
+
+```text
 Validation
     ↓
 Normalization
     ↓
-AI Qualification
+AI Processing
     ↓
-Structured Data
+Structured Output
     ↓
 Duplicate Detection
     ↓
 Database
     ↓
 API Response
-Design Principles
-
-The workflow follows several engineering principles:
-
-Validation Before Processing
-
-Invalid requests are rejected before expensive AI processing or database operations.
-
-Defense in Depth
-
-Duplicate protection exists both in the workflow and at the database level.
-
-Structured AI Output
-
-AI results are forced into a predictable schema before being used by downstream automation.
-
-Consistent API Responses
-
-Success and error responses follow a predictable structure.
-
-Separation of Responsibilities
-
-Each workflow stage has a specific responsibility:
-
-Validation
-    ↓
-AI Processing
-    ↓
-Data Transformation
-    ↓
-Database
-    ↓
-API Response
+```
